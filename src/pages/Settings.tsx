@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Palette, Shield, LogOut, Loader2, Save, Calendar, DollarSign } from 'lucide-react';
+import { User, Bell, Shield, LogOut, Loader2, Save, Calendar, DollarSign, Moon, Sun, Monitor } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -13,13 +13,16 @@ import { CurrencySelect } from '@/components/ui/currency-select';
 import { CycleDaySelect } from '@/components/ui/cycle-day-select';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { useTheme, Theme } from '@/hooks/useTheme';
 import { useToast } from '@/hooks/use-toast';
 import { formatCycleRange } from '@/lib/budget-cycle';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { preferences, currentCycle, loading: preferencesLoading, updatePreferences } = useUserPreferences();
+  const { theme, setTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -46,6 +49,12 @@ export default function SettingsPage() {
   const handleCycleDayChange = async (day: number) => {
     await updatePreferences({ cycleStartDay: day });
   };
+
+  const themeOptions: { value: Theme; label: string; icon: typeof Sun }[] = [
+    { value: 'light', label: 'Claro', icon: Sun },
+    { value: 'dark', label: 'Oscuro', icon: Moon },
+    { value: 'system', label: 'Sistema', icon: Monitor },
+  ];
 
   return (
     <AppLayout>
@@ -93,6 +102,41 @@ export default function SettingsPage() {
               {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Guardar cambios
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Moon className="h-5 w-5 text-primary" />
+              Apariencia
+            </CardTitle>
+            <CardDescription>Personaliza cómo se ve la aplicación</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label>Tema</Label>
+              <div className="flex gap-2">
+                {themeOptions.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <Button
+                      key={option.value}
+                      variant={theme === option.value ? 'default' : 'outline'}
+                      className={cn(
+                        "flex-1 gap-2",
+                        theme === option.value && "bg-primary"
+                      )}
+                      onClick={() => setTheme(option.value)}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
           </CardContent>
         </Card>
 

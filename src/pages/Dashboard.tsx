@@ -8,7 +8,8 @@ import {
   Users,
   ArrowUpRight,
   ArrowDownRight,
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -19,35 +20,54 @@ import { Progress } from '@/components/ui/progress';
 import { GroceryWidget } from '@/components/dashboard/GroceryWidget';
 import { useNavigate } from 'react-router-dom';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { useIncomes } from '@/hooks/useIncomes';
+import { useExpenses } from '@/hooks/useExpenses';
+import { useCreditCards } from '@/hooks/useCreditCards';
+import { useLoans } from '@/hooks/useLoans';
 import { formatCurrency } from '@/lib/currency';
 import { formatCycleRange } from '@/lib/budget-cycle';
-
-// Placeholder data - will be replaced with real data from Supabase
-const dashboardData = {
-  balance: 2450.00,
-  totalIncome: 4500.00,
-  totalExpenses: 2050.00,
-  remainingBudget: 1200.00,
-  dailyRecommended: 85.00,
-  budgetUsed: 63,
-};
-
-const upcomingExpenses = [
-  { id: 1, category: 'Alquiler', amount: 850, due_date: '2024-02-01', is_paid: false },
-  { id: 2, category: 'Internet', amount: 45, due_date: '2024-02-05', is_paid: false },
-  { id: 3, category: 'Luz', amount: 78, due_date: '2024-02-10', is_paid: false },
-];
-
-const recentTransactions = [
-  { id: 1, type: 'expense', category: 'Supermercado', amount: -85.50, date: '2024-01-28' },
-  { id: 2, type: 'income', category: 'Salario', amount: 3200.00, date: '2024-01-25' },
-  { id: 3, type: 'expense', category: 'Gasolina', amount: -55.00, date: '2024-01-24' },
-  { id: 4, type: 'expense', category: 'Restaurante', amount: -42.80, date: '2024-01-23' },
-];
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { preferences, currentCycle } = useUserPreferences();
+  const { totals: incomeTotals, loading: incomesLoading } = useIncomes();
+  const { expenses, totals: expenseTotals, loading: expensesLoading } = useExpenses();
+  const { getTotalDebt: getCardDebt, getMonthlyPayment: getCardMonthly } = useCreditCards();
+  const { getTotalDebt: getLoanDebt, getMonthlyPayment: getLoanMonthly } = useLoans();
+
+  const loading = incomesLoading || expensesLoading;
+
+  // Calculate dashboard data
+  const totalIncome = incomeTotals.net;
+  const totalExpenses = expenseTotals.total;
+  const balance = totalIncome - totalExpenses;
+  const totalDebt = getCardDebt() + getLoanDebt();
+  const monthlyDebtPayment = getCardMonthly() + getLoanMonthly();
+  const remainingBudget = totalIncome - totalExpenses - monthlyDebtPayment;
+  
+  const budgetUsed = totalIncome > 0 
+    ? Math.min(100, Math.round((totalExpenses / totalIncome) * 100))
+    : 0;
+
+  const dailyRecommended = currentCycle && currentCycle.daysRemaining > 0
+    ? remainingBudget / currentCycle.daysRemaining
+    : 0;
+
+  // Get upcoming expenses (unpaid fixed expenses)
+  const upcomingExpenses = expenses
+    .filter(e => e.type === 'fixed' && !e.is_paid && e.due_date)
+    .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+    .slice(0, 5);
+
+  // Get recent transactions
+  const recentTransactions = expenses
+    .filter(e => e.expense_date || e.due_date)
+    .sort((a, b) => {
+      const dateA = new Date(a.expense_date || a.due_date || a.created_at);
+      const dateB = new Date(b.expense_date || b.due_date || b.created_at);
+      return dateB.getTime() - dateA.getTime();
+    })
+    .slice(0, 5);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -63,6 +83,16 @@ export default function Dashboard() {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
   };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -81,29 +111,27 @@ export default function Dashboard() {
         <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Balance Actual"
-            value={formatCurrency(dashboardData.balance, preferences.currency)}
+            value={formatCurrency(balance, preferences.currency)}
             subtitle="Ingresos - Gastos del mes"
             icon={<Wallet className="h-6 w-6" />}
             variant="primary"
           />
           <StatCard
-            title="Ingresos"
-            value={formatCurrency(dashboardData.totalIncome, preferences.currency)}
+            title="Ingresos Netos"
+            value={formatCurrency(totalIncome, preferences.currency)}
             icon={<TrendingUp className="h-6 w-6" />}
             variant="income"
-            trend={{ value: 5.2, isPositive: true }}
           />
           <StatCard
             title="Gastos"
-            value={formatCurrency(dashboardData.totalExpenses, preferences.currency)}
+            value={formatCurrency(totalExpenses, preferences.currency)}
             icon={<TrendingDown className="h-6 w-6" />}
             variant="expense"
-            trend={{ value: 2.1, isPositive: false }}
           />
           <StatCard
             title="Disponible"
-            value={formatCurrency(dashboardData.remainingBudget, preferences.currency)}
-            subtitle={`${formatCurrency(dashboardData.dailyRecommended, preferences.currency)}/día recomendado`}
+            value={formatCurrency(Math.max(0, remainingBudget), preferences.currency)}
+            subtitle={dailyRecommended > 0 ? `${formatCurrency(dailyRecommended, preferences.currency)}/día recomendado` : undefined}
             icon={<Calendar className="h-6 w-6" />}
             variant="default"
           />
@@ -121,25 +149,43 @@ export default function Dashboard() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Gastado este mes</span>
-                  <span className="font-medium">{dashboardData.budgetUsed}%</span>
+                  <span className="text-muted-foreground">Gastado este ciclo</span>
+                  <span className="font-medium">{budgetUsed}%</span>
                 </div>
-                <Progress value={dashboardData.budgetUsed} className="h-3" />
+                <Progress value={budgetUsed} className="h-3" />
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="rounded-xl bg-income-muted p-4">
-                  <p className="text-sm text-muted-foreground">Presupuesto mensual</p>
+                  <p className="text-sm text-muted-foreground">Ingresos netos</p>
                   <p className="text-xl font-bold text-income">
-                    {formatCurrency(dashboardData.totalIncome, preferences.currency)}
+                    {formatCurrency(totalIncome, preferences.currency)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-expense-muted p-4">
                   <p className="text-sm text-muted-foreground">Gastado</p>
                   <p className="text-xl font-bold text-expense">
-                    {formatCurrency(dashboardData.totalExpenses, preferences.currency)}
+                    {formatCurrency(totalExpenses, preferences.currency)}
                   </p>
                 </div>
               </div>
+              {totalDebt > 0 && (
+                <div className="rounded-xl bg-debt-muted p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Deuda total</p>
+                      <p className="text-lg font-bold text-debt">
+                        {formatCurrency(totalDebt, preferences.currency)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Pago mensual</p>
+                      <p className="text-lg font-bold text-debt">
+                        {formatCurrency(monthlyDebtPayment, preferences.currency)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -157,27 +203,33 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {upcomingExpenses.map((expense) => (
-                  <div
-                    key={expense.id}
-                    className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium">{expense.category}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Vence el {new Date(expense.due_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      </p>
+              {upcomingExpenses.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">
+                  No hay gastos pendientes
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingExpenses.map((expense) => (
+                    <div
+                      key={expense.id}
+                      className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div>
+                        <p className="font-medium">{expense.description || expense.category}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Vence el {new Date(expense.due_date!).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-expense">
+                          {formatCurrency(Number(expense.amount), preferences.currency)}
+                        </p>
+                        <span className="text-xs text-warning">Pendiente</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-expense">
-                        {formatCurrency(expense.amount, preferences.currency)}
-                      </p>
-                      <span className="text-xs text-warning">Pendiente</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               <Button variant="outline" className="mt-4 w-full" onClick={() => navigate('/gastos')}>
                 Ver todos los gastos
               </Button>
@@ -195,38 +247,35 @@ export default function Dashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentTransactions.map((transaction) => (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center justify-between rounded-xl p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                        transaction.type === 'income' ? 'bg-income-muted' : 'bg-expense-muted'
-                      }`}>
-                        {transaction.type === 'income' ? (
-                          <ArrowUpRight className="h-5 w-5 text-income" />
-                        ) : (
+              {recentTransactions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">
+                  No hay movimientos recientes
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentTransactions.map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between rounded-xl p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-expense-muted">
                           <ArrowDownRight className="h-5 w-5 text-expense" />
-                        )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{transaction.description || transaction.category}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(transaction.expense_date || transaction.due_date || transaction.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{transaction.category}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(transaction.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                        </p>
-                      </div>
+                      <p className="font-semibold tabular-nums text-expense">
+                        -{formatCurrency(Number(transaction.amount), preferences.currency)}
+                      </p>
                     </div>
-                    <p className={`font-semibold tabular-nums ${
-                      transaction.amount > 0 ? 'text-income' : 'text-expense'
-                    }`}>
-                      {transaction.amount > 0 ? '+' : ''}
-                      {formatCurrency(Math.abs(transaction.amount), preferences.currency)}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

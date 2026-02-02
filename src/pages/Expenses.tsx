@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, 
@@ -10,8 +10,8 @@ import {
   Bell,
   BellOff,
   Calendar,
-  Filter,
-  Loader2
+  Loader2,
+  Users
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -26,45 +26,34 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { Expense, ExpenseType, ReminderChannel } from '@/lib/types';
+import { useExpenses, Expense, ExpenseFormData, ExpenseType, ReminderChannel } from '@/hooks/useExpenses';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { formatCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 const expenseCategories = [
   'Vivienda', 'Alimentación', 'Transporte', 'Servicios', 'Salud', 
   'Entretenimiento', 'Ropa', 'Educación', 'Otros'
 ];
 
-// Placeholder data
-const mockExpenses: Expense[] = [
-  { 
-    id: '1', user_id: '1', type: 'fixed', category: 'Vivienda', description: 'Alquiler mensual',
-    amount: 850, expense_date: null, due_date: '2024-02-01', is_paid: false,
-    reminder_enabled: true, reminder_channel: 'email', reminder_days_before: 3,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-  },
-  { 
-    id: '2', user_id: '1', type: 'fixed', category: 'Servicios', description: 'Internet fibra',
-    amount: 45, expense_date: null, due_date: '2024-02-05', is_paid: false,
-    reminder_enabled: false, reminder_channel: null, reminder_days_before: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-  },
-  { 
-    id: '3', user_id: '1', type: 'variable', category: 'Alimentación', description: 'Compra semanal',
-    amount: 85.50, expense_date: '2024-01-28', due_date: null, is_paid: true,
-    reminder_enabled: false, reminder_channel: null, reminder_days_before: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-  },
-];
+interface SharedBudget {
+  id: string;
+  name: string;
+}
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>(mockExpenses);
+  const { user } = useAuth();
+  const { expenses, loading, totals, addExpense, updateExpense, deleteExpense, togglePaid } = useExpenses();
+  const { preferences } = useUserPreferences();
   const [filter, setFilter] = useState<'all' | 'fixed' | 'variable'>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [sharedBudgets, setSharedBudgets] = useState<SharedBudget[]>([]);
   const [formData, setFormData] = useState({
     type: 'variable' as ExpenseType,
     category: '',
@@ -76,13 +65,28 @@ export default function ExpensesPage() {
     reminder_enabled: false,
     reminder_channel: 'email' as ReminderChannel,
     reminder_days_before: 3,
+    shared_budget_id: '' as string,
   });
-  const { toast } = useToast();
+
+  // Fetch shared budgets for the dropdown
+  useEffect(() => {
+    const fetchSharedBudgets = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('shared_budgets')
+        .select('id, name')
+        .or(`created_by.eq.${user.id}`);
+
+      if (!error && data) {
+        setSharedBudgets(data);
+      }
+    };
+
+    fetchSharedBudgets();
+  }, [user]);
 
   const filteredExpenses = expenses.filter(e => filter === 'all' || e.type === filter);
-  const totalFixed = expenses.filter(e => e.type === 'fixed').reduce((sum, e) => sum + e.amount, 0);
-  const totalVariable = expenses.filter(e => e.type === 'variable').reduce((sum, e) => sum + e.amount, 0);
-  const pendingCount = expenses.filter(e => !e.is_paid).length;
 
   const handleOpenForm = (expense?: Expense) => {
     if (expense) {
@@ -98,6 +102,7 @@ export default function ExpensesPage() {
         reminder_enabled: expense.reminder_enabled,
         reminder_channel: expense.reminder_channel || 'email',
         reminder_days_before: expense.reminder_days_before || 3,
+        shared_budget_id: expense.shared_budget_id || '',
       });
     } else {
       setEditingExpense(null);
@@ -112,75 +117,57 @@ export default function ExpensesPage() {
         reminder_enabled: false,
         reminder_channel: 'email',
         reminder_days_before: 3,
+        shared_budget_id: '',
       });
     }
     setIsFormOpen(true);
-  };
-
-  const togglePaid = (expense: Expense) => {
-    setExpenses(expenses.map(e => 
-      e.id === expense.id ? { ...e, is_paid: !e.is_paid } : e
-    ));
-    toast({ 
-      title: expense.is_paid ? 'Marcado como pendiente' : 'Marcado como pagado',
-      description: `${expense.category} ${expense.is_paid ? 'pendiente de pago' : 'pagado'}`
-    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    setTimeout(() => {
-      if (editingExpense) {
-        setExpenses(expenses.map(exp => 
-          exp.id === editingExpense.id 
-            ? { 
-                ...exp, 
-                ...formData, 
-                amount: parseFloat(formData.amount),
-                description: formData.description || null,
-                expense_date: formData.expense_date || null,
-                due_date: formData.due_date || null,
-                reminder_channel: formData.reminder_enabled ? formData.reminder_channel : null,
-                reminder_days_before: formData.reminder_enabled ? formData.reminder_days_before : null,
-              }
-            : exp
-        ));
-        toast({ title: 'Gasto actualizado' });
-      } else {
-        const newExpense: Expense = {
-          id: Date.now().toString(),
-          user_id: '1',
-          type: formData.type,
-          category: formData.category,
-          description: formData.description || null,
-          amount: parseFloat(formData.amount),
-          expense_date: formData.expense_date || null,
-          due_date: formData.due_date || null,
-          is_paid: formData.is_paid,
-          reminder_enabled: formData.reminder_enabled,
-          reminder_channel: formData.reminder_enabled ? formData.reminder_channel : null,
-          reminder_days_before: formData.reminder_enabled ? formData.reminder_days_before : null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setExpenses([...expenses, newExpense]);
-        toast({ title: 'Gasto añadido' });
-      }
-      setIsFormOpen(false);
-      setIsLoading(false);
-    }, 500);
+    const data: ExpenseFormData = {
+      type: formData.type,
+      category: formData.category,
+      description: formData.description || undefined,
+      amount: parseFloat(formData.amount),
+      expense_date: formData.expense_date || undefined,
+      due_date: formData.due_date || undefined,
+      is_paid: formData.is_paid,
+      reminder_enabled: formData.reminder_enabled,
+      reminder_channel: formData.reminder_enabled ? formData.reminder_channel : undefined,
+      reminder_days_before: formData.reminder_enabled ? formData.reminder_days_before : undefined,
+      shared_budget_id: formData.shared_budget_id || null,
+    };
+
+    if (editingExpense) {
+      await updateExpense(editingExpense.id, data);
+    } else {
+      await addExpense(data);
+    }
+
+    setIsFormOpen(false);
+    setIsLoading(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingExpense) {
-      setExpenses(expenses.filter(e => e.id !== deletingExpense.id));
-      toast({ title: 'Gasto eliminado' });
+      await deleteExpense(deletingExpense.id);
       setIsDeleteOpen(false);
       setDeletingExpense(null);
     }
   };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -199,21 +186,21 @@ export default function ExpensesPage() {
       <div className="grid gap-4 sm:grid-cols-3 mb-6">
         <StatCard
           title="Gastos Fijos"
-          value={totalFixed}
+          value={formatCurrency(totals.fixed, preferences.currency)}
           subtitle={`${expenses.filter(e => e.type === 'fixed').length} gastos`}
           icon={<Receipt className="h-6 w-6" />}
           variant="expense"
         />
         <StatCard
           title="Gastos Variables"
-          value={totalVariable}
+          value={formatCurrency(totals.variable, preferences.currency)}
           subtitle={`${expenses.filter(e => e.type === 'variable').length} gastos`}
           icon={<Receipt className="h-6 w-6" />}
           variant="default"
         />
         <StatCard
           title="Pendientes"
-          value={pendingCount}
+          value={totals.pending}
           subtitle="gastos por pagar"
           icon={<Calendar className="h-6 w-6" />}
           variant="default"
@@ -221,7 +208,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="all" className="mb-6" onValueChange={(v) => setFilter(v as any)}>
+      <Tabs defaultValue="all" className="mb-6" onValueChange={(v) => setFilter(v as 'all' | 'fixed' | 'variable')}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="fixed">Fijos</TabsTrigger>
@@ -257,7 +244,7 @@ export default function ExpensesPage() {
                     <div className="flex items-center gap-4">
                       {/* Paid Toggle */}
                       <button
-                        onClick={() => togglePaid(expense)}
+                        onClick={() => togglePaid(expense.id, expense.is_paid)}
                         className="flex-shrink-0 transition-transform hover:scale-110"
                       >
                         {expense.is_paid ? (
@@ -269,7 +256,7 @@ export default function ExpensesPage() {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={cn(
                             "text-xs font-medium px-2 py-0.5 rounded-full",
                             expense.type === 'fixed' 
@@ -281,6 +268,12 @@ export default function ExpensesPage() {
                           <span className="text-xs text-muted-foreground">{expense.category}</span>
                           {expense.reminder_enabled && (
                             <Bell className="h-3.5 w-3.5 text-warning" />
+                          )}
+                          {expense.shared_budget_id && (
+                            <span className="flex items-center gap-1 text-xs text-shared">
+                              <Users className="h-3 w-3" />
+                              Compartido
+                            </span>
                           )}
                         </div>
                         <p className={cn(
@@ -299,7 +292,7 @@ export default function ExpensesPage() {
                       {/* Amount */}
                       <div className="text-right">
                         <p className="text-lg font-bold text-expense tabular-nums">
-                          €{expense.amount.toFixed(2)}
+                          {formatCurrency(Number(expense.amount), preferences.currency)}
                         </p>
                       </div>
 
@@ -383,7 +376,7 @@ export default function ExpensesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amount">Monto (€)</Label>
+              <Label htmlFor="amount">Monto</Label>
               <Input
                 id="amount"
                 type="number"
@@ -420,6 +413,30 @@ export default function ExpensesPage() {
                 </div>
               )}
             </div>
+
+            {/* Shared Budget Selection */}
+            {sharedBudgets.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="shared_budget" className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-shared" />
+                  Presupuesto compartido (opcional)
+                </Label>
+                <Select 
+                  value={formData.shared_budget_id} 
+                  onValueChange={(value) => setFormData({ ...formData, shared_budget_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Gasto personal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Gasto personal</SelectItem>
+                    {sharedBudgets.map((budget) => (
+                      <SelectItem key={budget.id} value={budget.id}>{budget.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {formData.type === 'fixed' && (
               <div className="space-y-4 rounded-xl border p-4">
@@ -461,8 +478,8 @@ export default function ExpensesPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <SelectItem key={n} value={n.toString()}>{n} día{n > 1 ? 's' : ''}</SelectItem>
+                          {[1, 2, 3, 5, 7].map((days) => (
+                            <SelectItem key={days} value={days.toString()}>{days} días</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
