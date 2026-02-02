@@ -157,6 +157,74 @@ export type Database = {
         }
         Relationships: []
       }
+      grocery_budgets: {
+        Row: {
+          budget_amount: number
+          created_at: string
+          cycle_end_date: string
+          cycle_start_date: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_amount?: number
+          created_at?: string
+          cycle_end_date: string
+          cycle_start_date: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_amount?: number
+          created_at?: string
+          cycle_end_date?: string
+          cycle_start_date?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      grocery_purchases: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          grocery_budget_id: string
+          id: string
+          purchase_date: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description: string
+          grocery_budget_id: string
+          id?: string
+          purchase_date?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          grocery_budget_id?: string
+          id?: string
+          purchase_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grocery_purchases_grocery_budget_id_fkey"
+            columns: ["grocery_budget_id"]
+            isOneToOne: false
+            referencedRelation: "grocery_budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incomes: {
         Row: {
           created_at: string
@@ -194,6 +262,8 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          currency: string
+          cycle_start_day: number
           email: string | null
           full_name: string | null
           id: string
@@ -203,6 +273,8 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          currency?: string
+          cycle_start_day?: number
           email?: string | null
           full_name?: string | null
           id?: string
@@ -212,6 +284,8 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          currency?: string
+          cycle_start_day?: number
           email?: string | null
           full_name?: string | null
           id?: string

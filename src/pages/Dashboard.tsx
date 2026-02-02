@@ -16,7 +16,11 @@ import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { GroceryWidget } from '@/components/dashboard/GroceryWidget';
 import { useNavigate } from 'react-router-dom';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
+import { formatCurrency } from '@/lib/currency';
+import { formatCycleRange } from '@/lib/budget-cycle';
 
 // Placeholder data - will be replaced with real data from Supabase
 const dashboardData = {
@@ -43,6 +47,7 @@ const recentTransactions = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { preferences, currentCycle } = useUserPreferences();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -63,7 +68,7 @@ export default function Dashboard() {
     <AppLayout>
       <PageHeader 
         title="Dashboard"
-        description="Resumen de tu situación financiera actual"
+        description={currentCycle ? `Ciclo: ${formatCycleRange(currentCycle)}` : 'Resumen de tu situación financiera actual'}
       />
 
       <motion.div
@@ -76,37 +81,37 @@ export default function Dashboard() {
         <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Balance Actual"
-            value={dashboardData.balance}
+            value={formatCurrency(dashboardData.balance, preferences.currency)}
             subtitle="Ingresos - Gastos del mes"
             icon={<Wallet className="h-6 w-6" />}
             variant="primary"
           />
           <StatCard
             title="Ingresos"
-            value={dashboardData.totalIncome}
+            value={formatCurrency(dashboardData.totalIncome, preferences.currency)}
             icon={<TrendingUp className="h-6 w-6" />}
             variant="income"
             trend={{ value: 5.2, isPositive: true }}
           />
           <StatCard
             title="Gastos"
-            value={dashboardData.totalExpenses}
+            value={formatCurrency(dashboardData.totalExpenses, preferences.currency)}
             icon={<TrendingDown className="h-6 w-6" />}
             variant="expense"
             trend={{ value: 2.1, isPositive: false }}
           />
           <StatCard
             title="Disponible"
-            value={dashboardData.remainingBudget}
-            subtitle={`${dashboardData.dailyRecommended.toFixed(2)}€/día recomendado`}
+            value={formatCurrency(dashboardData.remainingBudget, preferences.currency)}
+            subtitle={`${formatCurrency(dashboardData.dailyRecommended, preferences.currency)}/día recomendado`}
             icon={<Calendar className="h-6 w-6" />}
             variant="default"
           />
         </motion.div>
 
-        {/* Budget Progress & Alerts */}
-        <motion.div variants={itemVariants} className="grid gap-6 lg:grid-cols-2">
-          <Card className="shadow-card">
+        {/* Budget Progress, Grocery & Alerts */}
+        <motion.div variants={itemVariants} className="grid gap-6 lg:grid-cols-3">
+          <Card className="shadow-card lg:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-primary" />
@@ -124,16 +129,26 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="rounded-xl bg-income-muted p-4">
                   <p className="text-sm text-muted-foreground">Presupuesto mensual</p>
-                  <p className="text-xl font-bold text-income">€{dashboardData.totalIncome.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-income">
+                    {formatCurrency(dashboardData.totalIncome, preferences.currency)}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-expense-muted p-4">
                   <p className="text-sm text-muted-foreground">Gastado</p>
-                  <p className="text-xl font-bold text-expense">€{dashboardData.totalExpenses.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-expense">
+                    {formatCurrency(dashboardData.totalExpenses, preferences.currency)}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Grocery Widget */}
+          <GroceryWidget />
+        </motion.div>
+
+        {/* Upcoming Expenses */}
+        <motion.div variants={itemVariants}>
           <Card className="shadow-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -155,7 +170,9 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-expense">€{expense.amount}</p>
+                      <p className="font-semibold text-expense">
+                        {formatCurrency(expense.amount, preferences.currency)}
+                      </p>
                       <span className="text-xs text-warning">Pendiente</span>
                     </div>
                   </div>
@@ -204,7 +221,8 @@ export default function Dashboard() {
                     <p className={`font-semibold tabular-nums ${
                       transaction.amount > 0 ? 'text-income' : 'text-expense'
                     }`}>
-                      {transaction.amount > 0 ? '+' : ''}€{Math.abs(transaction.amount).toFixed(2)}
+                      {transaction.amount > 0 ? '+' : ''}
+                      {formatCurrency(Math.abs(transaction.amount), preferences.currency)}
                     </p>
                   </div>
                 ))}

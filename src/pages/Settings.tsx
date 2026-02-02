@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Palette, Shield, LogOut, Loader2, Save } from 'lucide-react';
+import { User, Bell, Palette, Shield, LogOut, Loader2, Save, Calendar, DollarSign } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { CurrencySelect } from '@/components/ui/currency-select';
+import { CycleDaySelect } from '@/components/ui/cycle-day-select';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { useToast } from '@/hooks/use-toast';
+import { formatCycleRange } from '@/lib/budget-cycle';
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const { preferences, currentCycle, loading: preferencesLoading, updatePreferences } = useUserPreferences();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -32,6 +37,14 @@ export default function SettingsPage() {
       setIsLoading(false);
       toast({ title: 'Perfil actualizado', description: 'Tus cambios han sido guardados.' });
     }, 500);
+  };
+
+  const handleCurrencyChange = async (currency: 'COP' | 'USD') => {
+    await updatePreferences({ currency });
+  };
+
+  const handleCycleDayChange = async (day: number) => {
+    await updatePreferences({ cycleStartDay: day });
   };
 
   return (
@@ -80,6 +93,60 @@ export default function SettingsPage() {
               {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Guardar cambios
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Budget Preferences */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              Preferencias de Presupuesto
+            </CardTitle>
+            <CardDescription>Configura tu moneda y ciclo de presupuesto</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Currency Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="currency">Moneda</Label>
+              <CurrencySelect
+                value={preferences.currency}
+                onValueChange={handleCurrencyChange}
+                disabled={preferencesLoading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Todos los montos se mostrarán en esta moneda
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Budget Cycle */}
+            <div className="space-y-2">
+              <Label htmlFor="cycleDay" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Día de inicio del ciclo
+              </Label>
+              <CycleDaySelect
+                value={preferences.cycleStartDay}
+                onValueChange={handleCycleDayChange}
+                disabled={preferencesLoading}
+              />
+              <p className="text-xs text-muted-foreground">
+                El ciclo de presupuesto comienza el día {preferences.cycleStartDay} de cada mes
+              </p>
+              {currentCycle && (
+                <div className="mt-3 p-3 rounded-lg bg-muted/50 border">
+                  <p className="text-sm font-medium">Ciclo actual</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatCycleRange(currentCycle)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {currentCycle.daysRemaining} días restantes
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
