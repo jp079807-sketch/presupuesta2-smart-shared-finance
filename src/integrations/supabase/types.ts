@@ -14,6 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      card_purchases: {
+        Row: {
+          created_at: string
+          credit_card_id: string
+          description: string
+          id: string
+          installment_amount: number
+          installments_paid: number
+          installments_total: number
+          purchase_date: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_card_id: string
+          description: string
+          id?: string
+          installment_amount: number
+          installments_paid?: number
+          installments_total?: number
+          purchase_date?: string
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_card_id?: string
+          description?: string
+          id?: string
+          installment_amount?: number
+          installments_paid?: number
+          installments_total?: number
+          purchase_date?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_purchases_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_cards: {
+        Row: {
+          bank: string
+          created_at: string
+          credit_limit: number
+          cut_off_day: number
+          id: string
+          interest_rate: number | null
+          name: string
+          payment_due_day: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bank: string
+          created_at?: string
+          credit_limit?: number
+          cut_off_day: number
+          id?: string
+          interest_rate?: number | null
+          name: string
+          payment_due_day: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bank?: string
+          created_at?: string
+          credit_limit?: number
+          cut_off_day?: number
+          id?: string
+          interest_rate?: number | null
+          name?: string
+          payment_due_day?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       debt_payments: {
         Row: {
           amount: number
@@ -115,6 +204,7 @@ export type Database = {
             | null
           reminder_days_before: number | null
           reminder_enabled: boolean
+          shared_budget_id: string | null
           type: Database["public"]["Enums"]["expense_type"]
           updated_at: string
           user_id: string
@@ -133,6 +223,7 @@ export type Database = {
             | null
           reminder_days_before?: number | null
           reminder_enabled?: boolean
+          shared_budget_id?: string | null
           type?: Database["public"]["Enums"]["expense_type"]
           updated_at?: string
           user_id: string
@@ -151,11 +242,20 @@ export type Database = {
             | null
           reminder_days_before?: number | null
           reminder_enabled?: boolean
+          shared_budget_id?: string | null
           type?: Database["public"]["Enums"]["expense_type"]
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_shared_budget_id_fkey"
+            columns: ["shared_budget_id"]
+            isOneToOne: false
+            referencedRelation: "shared_budgets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grocery_budgets: {
         Row: {
@@ -231,6 +331,7 @@ export type Database = {
           frequency: string
           gross_amount: number
           id: string
+          income_type: string
           net_amount: number
           source: string
           updated_at: string
@@ -241,6 +342,7 @@ export type Database = {
           frequency?: string
           gross_amount?: number
           id?: string
+          income_type?: string
           net_amount?: number
           source: string
           updated_at?: string
@@ -251,8 +353,95 @@ export type Database = {
           frequency?: string
           gross_amount?: number
           id?: string
+          income_type?: string
           net_amount?: number
           source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      loan_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          loan_id: string
+          note: string | null
+          payment_date: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          loan_id: string
+          note?: string | null
+          payment_date?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          loan_id?: string
+          note?: string | null
+          payment_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_payments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          created_at: string
+          id: string
+          installment_amount: number
+          installments_paid: number
+          installments_total: number
+          interest_rate: number
+          lender: string | null
+          name: string
+          start_date: string
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          installment_amount: number
+          installments_paid?: number
+          installments_total: number
+          interest_rate?: number
+          lender?: string | null
+          name: string
+          start_date?: string
+          status?: string
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          installment_amount?: number
+          installments_paid?: number
+          installments_total?: number
+          interest_rate?: number
+          lender?: string | null
+          name?: string
+          start_date?: string
+          status?: string
+          total_amount?: number
           updated_at?: string
           user_id?: string
         }
@@ -267,6 +456,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          theme: string
           updated_at: string
           user_id: string
         }
@@ -278,6 +468,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          theme?: string
           updated_at?: string
           user_id: string
         }
@@ -289,6 +480,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          theme?: string
           updated_at?: string
           user_id?: string
         }

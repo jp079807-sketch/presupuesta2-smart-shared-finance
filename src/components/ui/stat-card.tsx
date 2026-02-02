@@ -74,7 +74,7 @@ export function StatCard({
             'text-3xl font-bold font-display tabular-nums tracking-tight',
             textStyles[variant]
           )}>
-            {typeof value === 'number' ? value.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) : value}
+            {value}
           </p>
           {subtitle && (
             <p className={cn(

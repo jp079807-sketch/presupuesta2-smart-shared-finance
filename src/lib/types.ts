@@ -1,6 +1,7 @@
 // Presupuesta2 Types
 
 export type Currency = 'COP' | 'USD';
+export type Theme = 'light' | 'dark' | 'system';
 
 export interface Profile {
   id: string;
@@ -10,16 +11,19 @@ export interface Profile {
   avatar_url: string | null;
   currency: Currency;
   cycle_start_day: number;
+  theme: Theme;
   created_at: string;
   updated_at: string;
 }
 
 export type IncomeFrequency = 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'one-time';
+export type IncomeType = 'labor_contract' | 'service_contract' | 'exempt';
 
 export interface Income {
   id: string;
   user_id: string;
   source: string;
+  income_type: IncomeType;
   gross_amount: number;
   net_amount: number;
   frequency: IncomeFrequency;
@@ -43,12 +47,69 @@ export interface Expense {
   reminder_enabled: boolean;
   reminder_channel: ReminderChannel | null;
   reminder_days_before: number | null;
+  shared_budget_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type DebtStatus = 'active' | 'paid' | 'defaulted';
 
+// Credit Cards
+export interface CreditCard {
+  id: string;
+  user_id: string;
+  name: string;
+  bank: string;
+  credit_limit: number;
+  cut_off_day: number;
+  payment_due_day: number;
+  interest_rate: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CardPurchase {
+  id: string;
+  user_id: string;
+  credit_card_id: string;
+  description: string;
+  total_amount: number;
+  installments_total: number;
+  installments_paid: number;
+  installment_amount: number;
+  purchase_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Loans (Créditos)
+export interface Loan {
+  id: string;
+  user_id: string;
+  name: string;
+  lender: string | null;
+  total_amount: number;
+  interest_rate: number;
+  installments_total: number;
+  installments_paid: number;
+  installment_amount: number;
+  start_date: string;
+  status: DebtStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LoanPayment {
+  id: string;
+  user_id: string;
+  loan_id: string;
+  amount: number;
+  payment_date: string;
+  note: string | null;
+  created_at: string;
+}
+
+// Legacy Debt type (for backwards compatibility)
 export interface Debt {
   id: string;
   user_id: string;
