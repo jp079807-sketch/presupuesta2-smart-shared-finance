@@ -1,11 +1,15 @@
 // Presupuesta2 Types
 
+export type Currency = 'COP' | 'USD';
+
 export interface Profile {
   id: string;
   user_id: string;
   email: string | null;
   full_name: string | null;
   avatar_url: string | null;
+  currency: Currency;
+  cycle_start_day: number;
   created_at: string;
   updated_at: string;
 }
@@ -164,4 +168,25 @@ export interface DebtFormData {
   period_months: number;
   installments_total: number;
   start_date: string;
+}
+
+// Grocery Types
+export interface GroceryBudget {
+  id: string;
+  user_id: string;
+  budget_amount: number;
+  cycle_start_date: string;
+  cycle_end_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroceryPurchase {
+  id: string;
+  user_id: string;
+  grocery_budget_id: string;
+  description: string;
+  amount: number;
+  purchase_date: string;
+  created_at: string;
 }

@@ -10,6 +10,7 @@ import AuthPage from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import IncomesPage from "./pages/Incomes";
 import ExpensesPage from "./pages/Expenses";
+import GroceryPage from "./pages/Grocery";
 import DebtsPage from "./pages/Debts";
 import SharedBudgetPage from "./pages/SharedBudget";
 import SettingsPage from "./pages/Settings";
@@ -96,6 +97,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ExpensesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mercado"
+        element={
+          <ProtectedRoute>
+            <GroceryPage />
           </ProtectedRoute>
         }
       />

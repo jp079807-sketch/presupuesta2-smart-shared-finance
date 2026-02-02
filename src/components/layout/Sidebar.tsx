@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Wallet
+  Wallet,
+  ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +22,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/ingresos', icon: TrendingUp, label: 'Ingresos' },
   { to: '/gastos', icon: Receipt, label: 'Gastos' },
+  { to: '/mercado', icon: ShoppingCart, label: 'Mercado' },
   { to: '/deudas', icon: CreditCard, label: 'Deudas' },
   { to: '/compartido', icon: Users, label: 'Compartido' },
 ];
