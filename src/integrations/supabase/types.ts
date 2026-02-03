@@ -72,8 +72,10 @@ export type Database = {
           cut_off_day: number
           id: string
           interest_rate: number | null
+          is_shared: boolean
           name: string
           payment_due_day: number
+          shared_budget_id: string | null
           updated_at: string
           user_id: string
         }
@@ -84,8 +86,10 @@ export type Database = {
           cut_off_day: number
           id?: string
           interest_rate?: number | null
+          is_shared?: boolean
           name: string
           payment_due_day: number
+          shared_budget_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -96,12 +100,22 @@ export type Database = {
           cut_off_day?: number
           id?: string
           interest_rate?: number | null
+          is_shared?: boolean
           name?: string
           payment_due_day?: number
+          shared_budget_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "credit_cards_shared_budget_id_fkey"
+            columns: ["shared_budget_id"]
+            isOneToOne: false
+            referencedRelation: "shared_budgets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       debt_payments: {
         Row: {
@@ -199,6 +213,7 @@ export type Database = {
           expense_date: string | null
           id: string
           is_paid: boolean
+          origin: string
           reminder_channel:
             | Database["public"]["Enums"]["reminder_channel"]
             | null
@@ -218,6 +233,7 @@ export type Database = {
           expense_date?: string | null
           id?: string
           is_paid?: boolean
+          origin?: string
           reminder_channel?:
             | Database["public"]["Enums"]["reminder_channel"]
             | null
@@ -237,6 +253,7 @@ export type Database = {
           expense_date?: string | null
           id?: string
           is_paid?: boolean
+          origin?: string
           reminder_channel?:
             | Database["public"]["Enums"]["reminder_channel"]
             | null
@@ -407,8 +424,10 @@ export type Database = {
           installments_paid: number
           installments_total: number
           interest_rate: number
+          is_shared: boolean
           lender: string | null
           name: string
+          shared_budget_id: string | null
           start_date: string
           status: string
           total_amount: number
@@ -422,8 +441,10 @@ export type Database = {
           installments_paid?: number
           installments_total: number
           interest_rate?: number
+          is_shared?: boolean
           lender?: string | null
           name: string
+          shared_budget_id?: string | null
           start_date?: string
           status?: string
           total_amount: number
@@ -437,15 +458,25 @@ export type Database = {
           installments_paid?: number
           installments_total?: number
           interest_rate?: number
+          is_shared?: boolean
           lender?: string | null
           name?: string
+          shared_budget_id?: string | null
           start_date?: string
           status?: string
           total_amount?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "loans_shared_budget_id_fkey"
+            columns: ["shared_budget_id"]
+            isOneToOne: false
+            referencedRelation: "shared_budgets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

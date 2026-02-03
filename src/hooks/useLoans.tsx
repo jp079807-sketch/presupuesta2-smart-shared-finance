@@ -17,6 +17,8 @@ export interface Loan {
   installment_amount: number;
   start_date: string;
   status: LoanStatus;
+  is_shared: boolean;
+  shared_budget_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +40,8 @@ export interface LoanFormData {
   interest_rate: number;
   installments_total: number;
   start_date: string;
+  is_shared?: boolean;
+  shared_budget_id?: string;
 }
 
 function calculateInstallment(total: number, rate: number, months: number): number {
@@ -123,6 +127,8 @@ export function useLoans() {
           installment_amount: installmentAmount,
           start_date: data.start_date,
           status: 'active',
+          is_shared: data.is_shared || false,
+          shared_budget_id: data.shared_budget_id || null,
         })
         .select()
         .single();
@@ -163,6 +169,8 @@ export function useLoans() {
           installments_total: data.installments_total,
           installment_amount: installmentAmount,
           start_date: data.start_date,
+          is_shared: data.is_shared || false,
+          shared_budget_id: data.shared_budget_id || null,
         })
         .eq('id', id)
         .eq('user_id', user.id)

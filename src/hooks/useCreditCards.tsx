@@ -12,6 +12,8 @@ export interface CreditCard {
   cut_off_day: number;
   payment_due_day: number;
   interest_rate: number | null;
+  is_shared: boolean;
+  shared_budget_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +39,8 @@ export interface CreditCardFormData {
   cut_off_day: number;
   payment_due_day: number;
   interest_rate?: number;
+  is_shared?: boolean;
+  shared_budget_id?: string;
 }
 
 export interface CardPurchaseFormData {
@@ -115,6 +119,8 @@ export function useCreditCards() {
           cut_off_day: data.cut_off_day,
           payment_due_day: data.payment_due_day,
           interest_rate: data.interest_rate || 0,
+          is_shared: data.is_shared || false,
+          shared_budget_id: data.shared_budget_id || null,
         })
         .select()
         .single();
@@ -148,6 +154,8 @@ export function useCreditCards() {
           cut_off_day: data.cut_off_day,
           payment_due_day: data.payment_due_day,
           interest_rate: data.interest_rate || 0,
+          is_shared: data.is_shared || false,
+          shared_budget_id: data.shared_budget_id || null,
         })
         .eq('id', id)
         .eq('user_id', user.id)
