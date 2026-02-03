@@ -11,14 +11,18 @@ import {
   BellOff,
   Calendar,
   Loader2,
-  Users
+  Users,
+  CreditCard,
+  Landmark,
+  TrendingUp,
+  Wallet
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatCard } from '@/components/ui/stat-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,6 +31,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useExpenses, Expense, ExpenseFormData, ExpenseType, ReminderChannel } from '@/hooks/useExpenses';
+import { useDebtExpenses, DebtExpense } from '@/hooks/useDebtExpenses';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { formatCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
@@ -35,7 +40,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const expenseCategories = [
   'Vivienda', 'Alimentación', 'Transporte', 'Servicios', 'Salud', 
-  'Entretenimiento', 'Ropa', 'Educación', 'Otros'
+  'Entretenimiento', 'Ropa', 'Educación', 'Deudas', 'Otros'
 ];
 
 interface SharedBudget {
@@ -46,8 +51,9 @@ interface SharedBudget {
 export default function ExpensesPage() {
   const { user } = useAuth();
   const { expenses, loading, totals, addExpense, updateExpense, deleteExpense, togglePaid } = useExpenses();
+  const { debtExpenses, totals: debtTotals, loading: debtLoading } = useDebtExpenses();
   const { preferences } = useUserPreferences();
-  const [filter, setFilter] = useState<'all' | 'fixed' | 'variable'>('all');
+  const [filter, setFilter] = useState<'all' | 'fixed' | 'variable' | 'debts'>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -86,7 +92,18 @@ export default function ExpensesPage() {
     fetchSharedBudgets();
   }, [user]);
 
-  const filteredExpenses = expenses.filter(e => filter === 'all' || e.type === filter);
+  const filteredExpenses = expenses.filter(e => {
+    if (filter === 'all') return true;
+    if (filter === 'debts') return false; // Debts shown separately
+    return e.type === filter;
+  });
+
+  // Combined totals including debt expenses
+  const combinedTotals = {
+    ...totals,
+    debts: debtTotals.total,
+    total: totals.total + debtTotals.total,
+  };
 
   const handleOpenForm = (expense?: Expense) => {
     if (expense) {
@@ -159,7 +176,7 @@ export default function ExpensesPage() {
     }
   };
 
-  if (loading) {
+  if (loading || debtLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
@@ -183,7 +200,7 @@ export default function ExpensesPage() {
       />
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3 mb-6">
+      <div className="grid gap-4 sm:grid-cols-4 mb-6">
         <StatCard
           title="Gastos Fijos"
           value={formatCurrency(totals.fixed, preferences.currency)}
@@ -199,124 +216,284 @@ export default function ExpensesPage() {
           variant="default"
         />
         <StatCard
-          title="Pendientes"
-          value={totals.pending}
-          subtitle="gastos por pagar"
+          title="Cuotas Deudas"
+          value={formatCurrency(debtTotals.total, preferences.currency)}
+          subtitle={`${debtExpenses.length} pagos pendientes`}
+          icon={<Wallet className="h-6 w-6" />}
+          variant="expense"
+        />
+        <StatCard
+          title="Total Mensual"
+          value={formatCurrency(combinedTotals.total, preferences.currency)}
+          subtitle={`${totals.pending} gastos pendientes`}
           icon={<Calendar className="h-6 w-6" />}
           variant="default"
         />
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="all" className="mb-6" onValueChange={(v) => setFilter(v as 'all' | 'fixed' | 'variable')}>
+      <Tabs defaultValue="all" className="mb-6" onValueChange={(v) => setFilter(v as 'all' | 'fixed' | 'variable' | 'debts')}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="fixed">Fijos</TabsTrigger>
           <TabsTrigger value="variable">Variables</TabsTrigger>
+          <TabsTrigger value="debts" className="flex items-center gap-1.5">
+            <Wallet className="h-3.5 w-3.5" />
+            Deudas
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {/* Expense List */}
-      {filteredExpenses.length === 0 ? (
-        <EmptyState
-          icon={<Receipt className="h-8 w-8" />}
-          title="No hay gastos registrados"
-          description="Añade tus gastos para llevar un control de tu presupuesto"
-          action={{ label: 'Añadir primer gasto', onClick: () => handleOpenForm() }}
-        />
-      ) : (
-        <motion.div layout className="space-y-3">
-          <AnimatePresence>
-            {filteredExpenses.map((expense) => (
-              <motion.div
-                key={expense.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <Card className={cn(
-                  "shadow-card hover:shadow-card-hover transition-all duration-300",
-                  expense.is_paid ? "opacity-60" : "",
-                  expense.type === 'fixed' ? "border-l-4 border-l-expense" : "border-l-4 border-l-muted-foreground/30"
-                )}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      {/* Paid Toggle */}
-                      <button
-                        onClick={() => togglePaid(expense.id, expense.is_paid)}
-                        className="flex-shrink-0 transition-transform hover:scale-110"
-                      >
-                        {expense.is_paid ? (
-                          <CheckCircle2 className="h-6 w-6 text-success" />
-                        ) : (
-                          <Circle className="h-6 w-6 text-muted-foreground" />
-                        )}
-                      </button>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={cn(
-                            "text-xs font-medium px-2 py-0.5 rounded-full",
-                            expense.type === 'fixed' 
-                              ? "bg-expense-muted text-expense" 
-                              : "bg-muted text-muted-foreground"
-                          )}>
-                            {expense.type === 'fixed' ? 'Fijo' : 'Variable'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{expense.category}</span>
-                          {expense.reminder_enabled && (
-                            <Bell className="h-3.5 w-3.5 text-warning" />
-                          )}
-                          {expense.shared_budget_id && (
-                            <span className="flex items-center gap-1 text-xs text-shared">
-                              <Users className="h-3 w-3" />
-                              Compartido
-                            </span>
+      {/* Debt Expenses Section - shown when 'debts' or 'all' is selected */}
+      {(filter === 'debts' || filter === 'all') && debtExpenses.length > 0 && (
+        <div className="mb-6">
+          {filter === 'all' && (
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Cuotas de Deudas del Periodo
+            </h3>
+          )}
+          <motion.div layout className="space-y-3">
+            <AnimatePresence>
+              {debtExpenses.map((debt) => (
+                <motion.div
+                  key={debt.id}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <Card className={cn(
+                    "shadow-card hover:shadow-card-hover transition-all duration-300",
+                    "border-l-4",
+                    debt.origin === 'loan' ? "border-l-warning" : "border-l-primary"
+                  )}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        {/* Icon */}
+                        <div className="flex-shrink-0">
+                          {debt.origin === 'loan' ? (
+                            <Landmark className="h-6 w-6 text-warning" />
+                          ) : (
+                            <CreditCard className="h-6 w-6 text-primary" />
                           )}
                         </div>
-                        <p className={cn(
-                          "font-medium truncate",
-                          expense.is_paid && "line-through"
-                        )}>
-                          {expense.description || expense.category}
-                        </p>
-                        {expense.due_date && (
-                          <p className="text-xs text-muted-foreground">
-                            Vence: {new Date(expense.due_date).toLocaleDateString('es-ES')}
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={cn(
+                              "text-xs font-medium px-2 py-0.5 rounded-full",
+                              debt.origin === 'loan'
+                                ? "bg-warning/10 text-warning"
+                                : "bg-primary/10 text-primary"
+                            )}>
+                              {debt.origin === 'loan' ? 'Préstamo' : 'Tarjeta'}
+                            </span>
+                            {debt.installment_number > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                Cuota {debt.installment_number}/{debt.installments_total}
+                              </span>
+                            )}
+                            {debt.is_shared && (
+                              <span className="flex items-center gap-1 text-xs text-shared">
+                                <Users className="h-3 w-3" />
+                                Compartido
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-medium truncate">
+                            {debt.source_name}
                           </p>
-                        )}
-                      </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                            {debt.due_date && (
+                              <span>
+                                Vence: {new Date(debt.due_date).toLocaleDateString('es-ES')}
+                              </span>
+                            )}
+                            {(debt.lender || debt.bank) && (
+                              <span>{debt.lender || debt.bank}</span>
+                            )}
+                          </div>
+                        </div>
 
-                      {/* Amount */}
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-expense tabular-nums">
-                          {formatCurrency(Number(expense.amount), preferences.currency)}
-                        </p>
+                        {/* Amount Breakdown */}
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-expense tabular-nums">
+                            {formatCurrency(debt.total_amount, preferences.currency)}
+                          </p>
+                          <div className="flex flex-col text-xs text-muted-foreground gap-0.5">
+                            <span className="flex items-center justify-end gap-1">
+                              <span>Capital:</span>
+                              <span className="tabular-nums">{formatCurrency(debt.principal_amount, preferences.currency)}</span>
+                            </span>
+                            {debt.interest_amount > 0 && (
+                              <span className="flex items-center justify-end gap-1 text-warning">
+                                <TrendingUp className="h-3 w-3" />
+                                <span>Interés:</span>
+                                <span className="tabular-nums">{formatCurrency(debt.interest_amount, preferences.currency)}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        </div>
+      )}
 
-                      {/* Actions */}
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenForm(expense)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => { setDeletingExpense(expense); setIsDeleteOpen(true); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+      {/* Debt summary card when debts filter is active */}
+      {filter === 'debts' && debtExpenses.length > 0 && (
+        <Card className="mb-6 bg-muted/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Resumen de Cuotas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-lg font-bold tabular-nums">{formatCurrency(debtTotals.total, preferences.currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Capital</p>
+                <p className="text-lg font-semibold tabular-nums">{formatCurrency(debtTotals.principal, preferences.currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-warning" />
+                  Intereses
+                </p>
+                <p className="text-lg font-semibold text-warning tabular-nums">{formatCurrency(debtTotals.interest, preferences.currency)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty state for debts */}
+      {filter === 'debts' && debtExpenses.length === 0 && (
+        <EmptyState
+          icon={<Wallet className="h-8 w-8" />}
+          title="No hay cuotas pendientes"
+          description="No tienes cuotas de deudas pendientes para este periodo"
+        />
+      )}
+
+      {/* Regular Expense List - hidden when only debts filter is active */}
+      {filter !== 'debts' && (
+        <>
+          {filter === 'all' && filteredExpenses.length > 0 && (
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Gastos Registrados
+            </h3>
+          )}
+          {filteredExpenses.length === 0 ? (
+            <EmptyState
+              icon={<Receipt className="h-8 w-8" />}
+              title="No hay gastos registrados"
+              description="Añade tus gastos para llevar un control de tu presupuesto"
+              action={{ label: 'Añadir primer gasto', onClick: () => handleOpenForm() }}
+            />
+          ) : (
+            <motion.div layout className="space-y-3">
+              <AnimatePresence>
+                {filteredExpenses.map((expense) => (
+                  <motion.div
+                    key={expense.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <Card className={cn(
+                      "shadow-card hover:shadow-card-hover transition-all duration-300",
+                      expense.is_paid ? "opacity-60" : "",
+                      expense.type === 'fixed' ? "border-l-4 border-l-expense" : "border-l-4 border-l-muted-foreground/30"
+                    )}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          {/* Paid Toggle */}
+                          <button
+                            onClick={() => togglePaid(expense.id, expense.is_paid)}
+                            className="flex-shrink-0 transition-transform hover:scale-110"
+                          >
+                            {expense.is_paid ? (
+                              <CheckCircle2 className="h-6 w-6 text-success" />
+                            ) : (
+                              <Circle className="h-6 w-6 text-muted-foreground" />
+                            )}
+                          </button>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={cn(
+                                "text-xs font-medium px-2 py-0.5 rounded-full",
+                                expense.type === 'fixed' 
+                                  ? "bg-expense-muted text-expense" 
+                                  : "bg-muted text-muted-foreground"
+                              )}>
+                                {expense.type === 'fixed' ? 'Fijo' : 'Variable'}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{expense.category}</span>
+                              {expense.reminder_enabled && (
+                                <Bell className="h-3.5 w-3.5 text-warning" />
+                              )}
+                              {expense.shared_budget_id && (
+                                <span className="flex items-center gap-1 text-xs text-shared">
+                                  <Users className="h-3 w-3" />
+                                  Compartido
+                                </span>
+                              )}
+                            </div>
+                            <p className={cn(
+                              "font-medium truncate",
+                              expense.is_paid && "line-through"
+                            )}>
+                              {expense.description || expense.category}
+                            </p>
+                            {expense.due_date && (
+                              <p className="text-xs text-muted-foreground">
+                                Vence: {new Date(expense.due_date).toLocaleDateString('es-ES')}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Amount */}
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-expense tabular-nums">
+                              {formatCurrency(Number(expense.amount), preferences.currency)}
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenForm(expense)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => { setDeletingExpense(expense); setIsDeleteOpen(true); }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </>
       )}
 
       {/* Form Dialog */}
