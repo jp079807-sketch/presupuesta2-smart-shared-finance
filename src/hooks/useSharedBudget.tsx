@@ -386,7 +386,8 @@ export function useSharedBudget() {
     if (!user || !budget) return false;
 
     try {
-      const { error } = await supabase
+      // First, insert the invitation record
+      const { error: insertError } = await supabase
         .from('shared_budget_members')
         .insert({
           budget_id: budget.id,
@@ -396,12 +397,41 @@ export function useSharedBudget() {
           contribution_percentage: 0,
         });
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      toast({
-        title: 'Invitación enviada',
-        description: `Se ha invitado a ${email}`,
+      // Get inviter's profile for the email
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('user_id', user.id)
+        .single();
+
+      const inviterName = profile?.full_name || profile?.email || 'Un usuario';
+
+      // Send invitation email via edge function
+      const { error: emailError } = await supabase.functions.invoke('send-budget-invitation', {
+        body: {
+          invitedEmail: email,
+          budgetName: budget.name,
+          inviterName,
+          budgetId: budget.id,
+        },
       });
+
+      if (emailError) {
+        console.error('Error sending invitation email:', emailError);
+        // Still show success since the invitation was created
+        toast({
+          title: 'Invitación creada',
+          description: `La invitación fue registrada pero hubo un problema enviando el email.`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Invitación enviada',
+          description: `Se ha enviado un email de invitación a ${email}`,
+        });
+      }
       
       await fetchBudget();
       return true;
