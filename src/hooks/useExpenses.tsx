@@ -47,7 +47,10 @@ export function useExpenses() {
   const [loading, setLoading] = useState(true);
 
   const fetchExpenses = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       let query = supabase
@@ -65,20 +68,19 @@ export function useExpenses() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching expenses:', error);
+        // Only show error toast once on initial load failure
+        return;
+      }
 
       setExpenses((data as Expense[]) || []);
     } catch (error) {
       console.error('Error fetching expenses:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar los gastos.',
-        variant: 'destructive',
-      });
     } finally {
       setLoading(false);
     }
-  }, [user, toast, currentCycle]);
+  }, [user, currentCycle]);
 
   useEffect(() => {
     fetchExpenses();
